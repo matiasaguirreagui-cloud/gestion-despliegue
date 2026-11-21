@@ -35,11 +35,12 @@ Documento de continuidad actualizado para la rama `despliegue` del repositorio o
 | 4. Revisiones preventivas y motor automático | ✅ Código + pruebas Mockito; compilación pendiente |
 | 5. Frontend conectado a consulta por ID y edición | ✅ Código implementado y `npm run build` correcto |
 | 6. Pruebas Mockito y `pruebas.http` | ✅ Compila; 30 pruebas ejecutadas, 30 pasaron; integraciones Docker omitidas |
-| 7. Verificación real Aiven/Brevo y manual final | 🟡 Manual y limpieza SQL listos; prueba real pendiente por JDK/Maven y dirección `CORREO_PRUEBA` |
+| 7. Verificación real Aiven/Brevo y manual final | 🟡 Manual y limpieza SQL listos; prueba de conexión bloqueada por `Connection refused` desde el entorno y falta `CORREO_PRUEBA` |
 
 ## Bloqueos de validación conocidos
 
-- La ejecución del backend y las pruebas reales usan Aiven/Brevo y siguen pendientes.
+- El backend compiló, pero al iniciarlo Hikari recibió `Connection refused` al abrir el socket de Aiven. La autenticación no llegó a probarse; no se ejecutaron migraciones, consultas ni cambios en la base.
+- Las llamadas HTTP/SQL reales y cualquier correo quedan pendientes hasta que el entorno pueda conectarse a Aiven y se defina `CORREO_PRUEBA`.
 - Para pruebas de correo real falta definir `CORREO_PRUEBA` con la dirección controlada del equipo.
 
 ## Últimas acciones
@@ -51,4 +52,5 @@ Documento de continuidad actualizado para la rama `despliegue` del repositorio o
 - `pruebas.http` cubre consultas, creación, edición y respuestas de error; deja señaladas las peticiones que envían correo real.
 - Se verificó `git diff --check`, `bash -n iniciar-backend.sh` y que `.env` tenga permisos `600` y esté ignorado.
 - Para que Maven resolviera dependencias se usó temporalmente un espejo de `repo1.maven.org` y el certificado de red del entorno; esos ajustes quedaron en `/tmp`, fuera del repo.
-- Hay ocho commits locales en `despliegue`; los cambios de corrección de pruebas también se guardarán localmente. No hacer `push`.
+- El arranque real llegó hasta Hikari y falló con `Connection refused`; no se inició el servidor HTTP ni se contactó Brevo.
+- Hay nueve commits locales en `despliegue`; no hacer `push`.
