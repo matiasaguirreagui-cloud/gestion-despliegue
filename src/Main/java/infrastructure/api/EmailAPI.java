@@ -15,6 +15,9 @@ public class EmailAPI {
 
     @PostMapping("/enviar")
     public ResponseEntity<String> enviarCorreo(@RequestBody EnviarCorreoRequest request) {
+        if (request == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe enviar los datos del correo.");
+        }
         emailService.enviarCorreo(request.destinatario(), request.asunto(), request.cuerpo());
         return ResponseEntity.ok("Correo enviado exitosamente");
     }

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { obtenerEquipos } from '../api/equiposApi.js';
-import { cerrarSolicitud, crearSolicitud, obtenerSolicitudes } from '../api/solicitudesApi.js';
+import { cerrarSolicitud, crearSolicitud, obtenerSolicitudPorId, obtenerSolicitudes } from '../api/solicitudesApi.js';
 import ConfirmacionModal from '../components/ConfirmacionModal.jsx';
 import EstadoCarga from '../components/EstadoCarga.jsx';
 import TablaDatos from '../components/TablaDatos.jsx';
 import Toast from '../components/Toast.jsx';
+import DetalleRegistroModal from '../components/DetalleRegistroModal.jsx';
 
 const formularioInicial = {
   equipoId: '', solicitanteId: '', solicitanteNombre: '', departamento: '', email: '', descripcion: '',
@@ -36,6 +37,8 @@ export default function SolicitudesPage() {
   const [solicitudEnCierre, setSolicitudEnCierre] = useState(null);
   const [confirmacionCierre, setConfirmacionCierre] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [solicitudDetalle, setSolicitudDetalle] = useState(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   async function cargarDatos() {
     setCargando(true);
@@ -110,6 +113,13 @@ export default function SolicitudesPage() {
     }
   }
 
+  async function verDetalle(id) {
+    setCargandoDetalle(true); setSolicitudDetalle({ idSolicitud: id });
+    try { setSolicitudDetalle(await obtenerSolicitudPorId(id)); }
+    catch (error) { setSolicitudDetalle(null); setAviso({ tipo: 'error', mensaje: error.message }); }
+    finally { setCargandoDetalle(false); }
+  }
+
   const columnas = [
     { clave: 'idSolicitud', titulo: 'N.º', render: (item) => `#${item.idSolicitud}` },
     { clave: 'equipo', titulo: 'Equipo', valorOrden: (item) => item.equipo?.idEquipo, render: (item) => <><strong>{item.equipo?.idEquipo || '—'}</strong><small className="d-block text-secondary">{item.equipo?.nombre || ''}</small></> },
@@ -118,9 +128,9 @@ export default function SolicitudesPage() {
     { clave: 'tecnicoAsignado', titulo: 'Técnico', valorOrden: (item) => item.tecnicoAsignado?.nombre, render: (item) => item.tecnicoAsignado?.nombre || '—' },
     { clave: 'estado', titulo: 'Estado', render: (item) => { const [texto, clase] = estadoVisual(item.estado); return <span className={`status-badge ${clase}`}>{texto}</span>; } },
     { clave: 'fechaHoraCreacion', titulo: 'Creada', render: (item) => mostrarFecha(item.fechaHoraCreacion) },
-    { titulo: 'Acciones', render: (item) => item.estado?.toLocaleLowerCase('es-CO') === 'cerrado'
+    { titulo: 'Acciones', render: (item) => <div className="d-flex flex-wrap gap-1"><button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => verDetalle(item.idSolicitud)}>Ver</button>{item.estado?.toLocaleLowerCase('es-CO') === 'cerrado'
       ? <span className="action-completed">Cerrada</span>
-      : <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setSolicitudEnCierre(item)}><i className="bi bi-check2-circle me-1" aria-hidden="true" />Cerrar</button> },
+      : <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => setSolicitudEnCierre(item)}><i className="bi bi-check2-circle me-1" aria-hidden="true" />Cerrar</button>}</div> },
   ];
 
   const equiposDisponibles = equipos.filter((equipo) => !equipo.fueraDeServicio && equipo.estado?.toLocaleLowerCase('es-CO') !== 'fuera de servicio');
@@ -145,8 +155,8 @@ export default function SolicitudesPage() {
         <section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="solicitud-modal-title"><div className="form-modal-heading"><div><p className="eyebrow">NUEVO REPORTE</p><h2 id="solicitud-modal-title">Registrar solicitud</h2></div><button className="icon-button" type="button" aria-label="Cerrar formulario" onClick={() => setMostrarFormulario(false)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div>
           <form onSubmit={guardarSolicitud}>
             <div className="form-field"><label htmlFor="sol-equipo">Equipo <span>*</span></label><select id="sol-equipo" className="form-select" name="equipoId" required value={formulario.equipoId} onChange={cambiarCampo}><option value="">Selecciona un equipo</option>{equiposDisponibles.map((equipo) => <option key={equipo.idEquipo} value={equipo.idEquipo}>{equipo.idEquipo} · {equipo.nombre} — {equipo.ubicacion}</option>)}</select>{equiposDisponibles.length === 0 && <small className="text-danger">No hay equipos operativos registrados.</small>}</div>
-            <div className="form-row"><div className="form-field"><label htmlFor="sol-id">ID del solicitante <span>*</span></label><input id="sol-id" className="form-control" name="solicitanteId" maxLength="40" required value={formulario.solicitanteId} onChange={cambiarCampo} /></div><div className="form-field"><label htmlFor="sol-nombre">Nombre <span>*</span></label><input id="sol-nombre" className="form-control" name="solicitanteNombre" maxLength="120" required value={formulario.solicitanteNombre} onChange={cambiarCampo} /></div></div>
-            <div className="form-row"><div className="form-field"><label htmlFor="sol-departamento">Departamento <span>*</span></label><input id="sol-departamento" className="form-control" name="departamento" maxLength="100" required value={formulario.departamento} onChange={cambiarCampo} /></div><div className="form-field"><label htmlFor="sol-email">Correo <span>*</span></label><input id="sol-email" className="form-control" type="email" name="email" maxLength="254" required value={formulario.email} onChange={cambiarCampo} /></div></div>
+            <div className="form-row"><div className="form-field"><label htmlFor="sol-id">ID del solicitante <span>*</span></label><input id="sol-id" className="form-control" name="solicitanteId" maxLength="30" required value={formulario.solicitanteId} onChange={cambiarCampo} /></div><div className="form-field"><label htmlFor="sol-nombre">Nombre <span>*</span></label><input id="sol-nombre" className="form-control" name="solicitanteNombre" maxLength="120" required value={formulario.solicitanteNombre} onChange={cambiarCampo} /></div></div>
+            <div className="form-row"><div className="form-field"><label htmlFor="sol-departamento">Departamento <span>*</span></label><input id="sol-departamento" className="form-control" name="departamento" maxLength="120" required value={formulario.departamento} onChange={cambiarCampo} /></div><div className="form-field"><label htmlFor="sol-email">Correo <span>*</span></label><input id="sol-email" className="form-control" type="email" name="email" maxLength="254" required value={formulario.email} onChange={cambiarCampo} /></div></div>
             <div className="form-field"><label htmlFor="sol-descripcion">Descripción de la falla <span>*</span></label><textarea id="sol-descripcion" className="form-control" name="descripcion" rows="4" maxLength="2000" required value={formulario.descripcion} onChange={cambiarCampo} /></div>
             <div className="initial-state-note"><i className="bi bi-info-circle" aria-hidden="true" />Al guardar, el backend asigna el técnico con menor carga y envía un correo al solicitante.</div>
             <div className="modal-actions"><button className="btn btn-light" type="button" disabled={guardando} onClick={() => setMostrarFormulario(false)}>Cancelar</button><button className="btn btn-primary" type="submit" disabled={guardando || equiposDisponibles.length === 0}>{guardando && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}Crear solicitud</button></div>
@@ -156,6 +166,14 @@ export default function SolicitudesPage() {
 
       {solicitudEnCierre && <div className="modal-backdrop-custom" role="presentation"><section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="cierre-title"><div className="form-modal-heading"><div><p className="eyebrow">SOLICITUD #{solicitudEnCierre.idSolicitud}</p><h2 id="cierre-title">Documentar cierre</h2></div><button className="icon-button" type="button" aria-label="Cancelar cierre" onClick={() => setSolicitudEnCierre(null)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div><form onSubmit={(event) => { event.preventDefault(); const datos = new FormData(event.currentTarget); setConfirmacionCierre({ idSolicitud: solicitudEnCierre.idSolicitud, diagnostico: datos.get('diagnostico'), solucion: datos.get('solucion') }); }}><div className="form-field"><label htmlFor="cierre-diagnostico">Diagnóstico <span>*</span></label><textarea id="cierre-diagnostico" className="form-control" name="diagnostico" rows="3" maxLength="2000" required /></div><div className="form-field"><label htmlFor="cierre-solucion">Solución aplicada <span>*</span></label><textarea id="cierre-solucion" className="form-control" name="solucion" rows="3" maxLength="2000" required /></div><p className="text-secondary small">Al confirmar, se enviará el correo de cierre antes de guardar los cambios.</p><div className="modal-actions"><button className="btn btn-light" type="button" onClick={() => setSolicitudEnCierre(null)}>Cancelar</button><button className="btn btn-primary" type="submit">Continuar</button></div></form></section></div>}
       {confirmacionCierre && <ConfirmacionModal titulo={`Cerrar solicitud #${confirmacionCierre.idSolicitud}`} mensaje="Se notificará al solicitante y se liberará la carga del técnico asignado. ¿Confirmas el cierre?" textoConfirmar="Confirmar cierre" cargando={guardando} alCancelar={() => setConfirmacionCierre(null)} alConfirmar={confirmarCierre} />}
+      {solicitudDetalle && <DetalleRegistroModal titulo={`Solicitud #${solicitudDetalle.idSolicitud}`} cargando={cargandoDetalle} alCerrar={() => setSolicitudDetalle(null)} campos={[
+        { etiqueta: 'Estado', valor: solicitudDetalle.estado }, { etiqueta: 'Equipo', valor: `${solicitudDetalle.equipo?.idEquipo || '—'} · ${solicitudDetalle.equipo?.nombre || ''}` },
+        { etiqueta: 'Descripción', valor: solicitudDetalle.descripcionFalla }, { etiqueta: 'Solicitante', valor: solicitudDetalle.solicitante?.nombre },
+        { etiqueta: 'Departamento', valor: solicitudDetalle.solicitante?.departamento }, { etiqueta: 'Correo', valor: solicitudDetalle.solicitante?.email },
+        { etiqueta: 'Técnico', valor: solicitudDetalle.tecnicoAsignado?.nombre }, { etiqueta: 'Diagnóstico', valor: solicitudDetalle.diagnostico },
+        { etiqueta: 'Solución', valor: solicitudDetalle.solucion }, { etiqueta: 'Creada', valor: mostrarFecha(solicitudDetalle.fechaHoraCreacion) },
+        { etiqueta: 'Cerrada', valor: mostrarFecha(solicitudDetalle.fechaHoraCierre) },
+      ]} />}
     </section>
   );
 }

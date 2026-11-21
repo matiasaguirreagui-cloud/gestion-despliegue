@@ -3,30 +3,20 @@ package infrastructure.api;
 import domain.model.Equipo;
 import domain.model.SolicitudMantenimiento;
 import domain.model.UsuarioSolicitante;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import service.EquipoService;
 import service.SolicitudService;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/solicitudes")
 public class SolicitudAPI {
     private final SolicitudService solicitudService;
-    private final EquipoService equipoService;
 
     public SolicitudAPI(SolicitudService solicitudService) {
-        this(solicitudService, null);
-    }
-
-    @Autowired
-    public SolicitudAPI(SolicitudService solicitudService, EquipoService equipoService) {
         this.solicitudService = solicitudService;
-        this.equipoService = equipoService;
     }
 
     @GetMapping
@@ -34,17 +24,18 @@ public class SolicitudAPI {
         return ResponseEntity.ok(solicitudService.obtenerTodas());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<SolicitudMantenimiento> obtenerSolicitud(@PathVariable int id) {
+        return ResponseEntity.ok(solicitudService.obtenerPorId(id));
+    }
+
     @PostMapping
     public ResponseEntity<SolicitudMantenimiento> registrarSolicitud(
             @RequestBody CrearSolicitudRequest request) {
-        Equipo equipo;
-        if (equipoService != null && request.equipoId() != null && !request.equipoId().isBlank()) {
-            equipo = equipoService.buscarPorId(request.equipoId())
-                    .orElseThrow(() -> new NoSuchElementException(
-                            "No existe el equipo " + request.equipoId() + "."));
-        } else {
-            equipo = new Equipo(request.equipoId(), request.equipoNombre(), request.equipoUbicacion());
+        if (request == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe enviar los datos de la solicitud.");
         }
+        Equipo equipo = new Equipo(request.equipoId(), request.equipoNombre(), request.equipoUbicacion());
 
         UsuarioSolicitante solicitante = new UsuarioSolicitante(
                 request.solicitanteId(), request.solicitanteNombre(),
@@ -58,6 +49,9 @@ public class SolicitudAPI {
     @PostMapping("/{id}/cerrar")
     public ResponseEntity<SolicitudMantenimiento> cerrarSolicitud(
             @PathVariable int id, @RequestBody CerrarSolicitudRequest request) {
+        if (request == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe enviar el diagnóstico y la solución.");
+        }
         return ResponseEntity.ok(solicitudService.cerrarSolicitud(
                 id, request.diagnostico(), request.solucion()));
     }

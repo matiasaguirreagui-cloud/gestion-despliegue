@@ -3,6 +3,8 @@ package domain.model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import domain.exeptions.SolicitudInvalidaException;
+import domain.exeptions.ConflictoNegocioException;
+import domain.exeptions.DatosInvalidosException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -32,7 +34,6 @@ public class SolicitudMantenimiento {
 
     @Column(name = "estado", length = 20, nullable = false)
     private String estado;
-    private static int contadorSolicitudes = 0;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "equipo_id", nullable = false)
@@ -84,11 +85,6 @@ public class SolicitudMantenimiento {
         this.estado = "REPORTADO";
         this.tecnicoAsignado = null;
         this.fechaHoraCreacion = LocalDateTime.now(ZoneId.of("America/Bogota"));
-        contadorSolicitudes++;
-    }
-
-    public static int getContadorSolicitudes() {
-        return contadorSolicitudes;
     }
 
     public void asignarTecnico(Tecnico tecnico) {
@@ -98,10 +94,10 @@ public class SolicitudMantenimiento {
 
     public void cerrar(String diagnostico, String solucion) {
         if (diagnostico == null || diagnostico.isBlank() || solucion == null || solucion.isBlank()) {
-            throw new IllegalArgumentException("Debe escribir el diagnóstico y la solución para cerrar la solicitud.");
+            throw new DatosInvalidosException("Debe escribir el diagnóstico y la solución para cerrar la solicitud.");
         }
         if ("Cerrado".equals(estado)) {
-            throw new IllegalStateException("La solicitud ya está cerrada.");
+            throw new ConflictoNegocioException("La solicitud ya está cerrada.");
         }
         this.diagnostico = diagnostico.trim();
         this.solucion = solucion.trim();

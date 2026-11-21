@@ -20,6 +20,9 @@ public class ReporteAPI {
     @PostMapping("/tecnicos/semanal/enviar")
     public ResponseEntity<ReporteSemanalDTO> enviarReporteSemanal(
             @RequestBody EnviarReporteRequest request) {
+        if (request == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe indicar el correo del coordinador.");
+        }
         return ResponseEntity.ok(reporteSemanalService.enviarReporteSemanal(request.emailCoordinador()));
     }
 

@@ -19,11 +19,6 @@ public class UsuarioSolicitante extends Usuario {
         super();
     }
 
-    public UsuarioSolicitante(String idUsuario, String nombre, String departamento) {
-        super(idUsuario, nombre, departamento);
-        this.email = nombre.toLowerCase().replace(" ", "") + "@empresa.com";
-    }
-
     public UsuarioSolicitante(String idUsuario, String nombre, String departamento, String email) {
         super(idUsuario, nombre, departamento);
         this.email = email;
@@ -39,4 +34,9 @@ public class UsuarioSolicitante extends Usuario {
     }
 
     public String getEmail() { return email; }
+
+    public void actualizarDatos(String nombre, String departamento, String email) {
+        super.actualizarDatos(nombre, departamento);
+        this.email = email;
+    }
 }

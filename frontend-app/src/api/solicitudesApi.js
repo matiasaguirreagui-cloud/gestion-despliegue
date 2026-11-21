@@ -4,6 +4,10 @@ export function obtenerSolicitudes() {
   return apiRequest('/api/solicitudes');
 }
 
+export function obtenerSolicitudPorId(id) {
+  return apiRequest(`/api/solicitudes/${encodeURIComponent(id)}`);
+}
+
 export function crearSolicitud(solicitud) {
   return apiRequest('/api/solicitudes', { method: 'POST', body: JSON.stringify(solicitud) });
 }
