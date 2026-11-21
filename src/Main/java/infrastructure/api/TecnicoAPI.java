@@ -2,6 +2,7 @@ package infrastructure.api;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import domain.model.Tecnico;
 import service.TecnicoService;
 import service.dto.TecnicoCargaDTO;
 
@@ -23,6 +24,11 @@ public class TecnicoAPI {
         return ResponseEntity.ok(tecnicoService.consultarCargaTecnicos());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Tecnico> obtenerTecnico(@PathVariable String id) {
+        return ResponseEntity.ok(tecnicoService.obtenerPorId(id));
+    }
+
     // Endpoint para asignar un caso manualmente a un técnico
     @PostMapping("/{id}/asignar")
     public ResponseEntity<String> asignarCaso(@PathVariable String id) {
@@ -32,8 +38,15 @@ public class TecnicoAPI {
 
     // Endpoint para registrar un nuevo técnico
     @PostMapping
-    public ResponseEntity<String> registrarTecnico(@RequestBody service.dto.TecnicoCreacionDTO nuevoTecnicoDTO) {
-        tecnicoService.registrarNuevoTecnico(nuevoTecnicoDTO);
-        return ResponseEntity.ok("Técnico registrado correctamente con ID: " + nuevoTecnicoDTO.getIdUsuario());
+    public ResponseEntity<Tecnico> registrarTecnico(@RequestBody service.dto.TecnicoCreacionDTO nuevoTecnicoDTO) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(tecnicoService.registrarNuevoTecnico(nuevoTecnicoDTO));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Tecnico> actualizarTecnico(
+            @PathVariable String id,
+            @RequestBody service.dto.TecnicoCreacionDTO tecnicoDTO) {
+        return ResponseEntity.ok(tecnicoService.actualizarTecnico(id, tecnicoDTO));
     }
 }

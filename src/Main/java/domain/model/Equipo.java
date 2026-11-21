@@ -71,6 +71,13 @@ public class Equipo {
         this.estado = "Fuera de servicio";
     }
 
+    public void actualizarDatos(String marca, String modelo, String ubicacion) {
+        this.marca = marca;
+        this.modelo = modelo;
+        this.nombre = (marca + " " + modelo).trim();
+        this.ubicacion = ubicacion;
+    }
+
     public boolean isFueraDeServicio() {
         return "Fuera de servicio".equalsIgnoreCase(this.estado);
     }

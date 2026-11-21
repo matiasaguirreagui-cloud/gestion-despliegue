@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { asignarCasoManual, crearTecnico, obtenerCargaTecnicos } from '../api/tecnicosApi.js';
+import { actualizarTecnico, asignarCasoManual, crearTecnico, obtenerCargaTecnicos, obtenerTecnicoPorId } from '../api/tecnicosApi.js';
 import ConfirmacionModal from '../components/ConfirmacionModal.jsx';
 import EstadoCarga from '../components/EstadoCarga.jsx';
 import TablaDatos from '../components/TablaDatos.jsx';
 import Toast from '../components/Toast.jsx';
+import DetalleRegistroModal from '../components/DetalleRegistroModal.jsx';
 
 const inicial = { idUsuario: '', nombre: '', departamento: '', especialidad: '' };
 
@@ -22,6 +23,9 @@ export default function TecnicosPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [formulario, setFormulario] = useState(inicial);
   const [tecnicoPorAsignar, setTecnicoPorAsignar] = useState(null);
+  const [tecnicoEdicion, setTecnicoEdicion] = useState(null);
+  const [tecnicoDetalle, setTecnicoDetalle] = useState(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   async function cargarTecnicos() {
@@ -59,13 +63,42 @@ export default function TecnicosPage() {
     finally { setGuardando(false); }
   }
 
+  async function verDetalle(id) {
+    setCargandoDetalle(true); setTecnicoDetalle({ idUsuario: id });
+    try { setTecnicoDetalle(await obtenerTecnicoPorId(id)); }
+    catch (error) { setTecnicoDetalle(null); setAviso({ tipo: 'error', mensaje: error.message }); }
+    finally { setCargandoDetalle(false); }
+  }
+
+  async function editar(id) {
+    try {
+      const tecnico = await obtenerTecnicoPorId(id);
+      setTecnicoEdicion({ idUsuario: tecnico.idUsuario, nombre: tecnico.nombre, departamento: tecnico.departamento, especialidad: tecnico.especialidad });
+    } catch (error) { setAviso({ tipo: 'error', mensaje: error.message }); }
+  }
+
+  async function guardarEdicion(evento) {
+    evento.preventDefault(); if (!tecnicoEdicion) return;
+    setGuardando(true);
+    try {
+      await actualizarTecnico(tecnicoEdicion.idUsuario, {
+        nombre: tecnicoEdicion.nombre.trim(), departamento: tecnicoEdicion.departamento.trim(), especialidad: tecnicoEdicion.especialidad.trim(),
+      });
+      setTecnicoEdicion(null); await cargarTecnicos();
+      setAviso({ tipo: 'exito', mensaje: `El técnico ${tecnicoEdicion.idUsuario} quedó actualizado.` });
+    } catch (error) { setAviso({ tipo: 'error', mensaje: error.message }); }
+    finally { setGuardando(false); }
+  }
+
   const columnas = [
     { clave: 'idUsuario', titulo: 'ID' },
     { clave: 'nombre', titulo: 'Técnico' },
+    { clave: 'departamento', titulo: 'Departamento' },
+    { clave: 'especialidad', titulo: 'Especialidad' },
     { clave: 'casosActivos', titulo: 'Casos activos' },
     { clave: 'porcentajeOcupacion', titulo: 'Ocupación', valorOrden: (item) => item.casosActivos, render: (item) => <div className="occupancy-cell"><div className="progress occupancy-progress" role="progressbar" aria-label={`Ocupación de ${item.nombre}`} aria-valuenow={item.casosActivos * 20} aria-valuemin="0" aria-valuemax="100"><div className={`progress-bar ${item.casosActivos >= 5 ? 'bg-danger' : item.casosActivos >= 3 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${Math.min(100, item.casosActivos * 20)}%` }} /></div><span>{item.porcentajeOcupacion}</span></div> },
     { clave: 'estado', titulo: 'Disponibilidad', render: (item) => { const [texto, clase] = estadoTecnico(item.estado); return <span className={`status-badge ${clase}`}>{texto}</span>; } },
-    { titulo: 'Acción', render: (item) => <button className="btn btn-outline-primary btn-sm" type="button" disabled={item.casosActivos >= 5} title="Incrementa la carga manual del técnico; no crea una solicitud" onClick={() => setTecnicoPorAsignar(item)}><i className="bi bi-plus-circle me-1" aria-hidden="true" />Sumar caso</button> },
+    { titulo: 'Acciones', render: (item) => <div className="d-flex flex-wrap gap-1"><button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => verDetalle(item.idUsuario)}>Ver</button><button className="btn btn-outline-primary btn-sm" type="button" onClick={() => editar(item.idUsuario)}>Editar</button><button className="btn btn-outline-primary btn-sm" type="button" disabled={item.casosActivos >= 5} title="Incrementa la carga manual del técnico; no crea una solicitud" onClick={() => setTecnicoPorAsignar(item)}><i className="bi bi-plus-circle me-1" aria-hidden="true" />Sumar caso</button></div> },
   ];
 
   return <section className="page-section">
@@ -74,7 +107,13 @@ export default function TecnicosPage() {
     <div className="table-card"><div className="table-toolbar"><div className="search-control"><i className="bi bi-search" aria-hidden="true" /><input className="form-control" type="search" aria-label="Buscar técnicos" placeholder="Buscar por ID o nombre" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} /></div><span className="result-count">{filtrados.length} técnicos · máximo 5 casos por técnico</span></div>
       {cargando ? <EstadoCarga mensaje="Cargando técnicos…" /> : errorCarga ? <div className="load-error" role="alert"><span>{errorCarga}</span><button className="btn btn-outline-primary btn-sm" type="button" onClick={cargarTecnicos}>Reintentar</button></div> : <TablaDatos columnas={columnas} filas={filtrados} claveFila={(item) => item.idUsuario} textoVacio={tecnicos.length ? 'No se encontraron técnicos.' : 'Todavía no hay técnicos registrados.'} />}
     </div>
-    {modalAbierto && <div className="modal-backdrop-custom" role="presentation"><section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="tecnico-modal-title"><div className="form-modal-heading"><div><p className="eyebrow">EQUIPO DE MANTENIMIENTO</p><h2 id="tecnico-modal-title">Registrar técnico</h2></div><button className="icon-button" type="button" aria-label="Cerrar formulario" onClick={() => setModalAbierto(false)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div><form onSubmit={guardar}><div className="form-field"><label htmlFor="tec-id">ID de usuario <span>*</span></label><input id="tec-id" className="form-control" name="idUsuario" maxLength="40" required value={formulario.idUsuario} onChange={(event) => setFormulario({ ...formulario, idUsuario: event.target.value })} /></div><div className="form-row"><div className="form-field"><label htmlFor="tec-nombre">Nombre <span>*</span></label><input id="tec-nombre" className="form-control" name="nombre" maxLength="120" required value={formulario.nombre} onChange={(event) => setFormulario({ ...formulario, nombre: event.target.value })} /></div><div className="form-field"><label htmlFor="tec-depto">Departamento <span>*</span></label><input id="tec-depto" className="form-control" name="departamento" maxLength="100" required value={formulario.departamento} onChange={(event) => setFormulario({ ...formulario, departamento: event.target.value })} /></div></div><div className="form-field"><label htmlFor="tec-especialidad">Especialidad <span>*</span></label><input id="tec-especialidad" className="form-control" name="especialidad" maxLength="120" required value={formulario.especialidad} onChange={(event) => setFormulario({ ...formulario, especialidad: event.target.value })} /></div><div className="initial-state-note"><i className="bi bi-info-circle" aria-hidden="true" />La carga máxima admitida es de cinco casos activos.</div><div className="modal-actions"><button className="btn btn-light" type="button" onClick={() => setModalAbierto(false)}>Cancelar</button><button className="btn btn-primary" type="submit" disabled={guardando}>{guardando && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}Guardar técnico</button></div></form></section></div>}
+    {modalAbierto && <div className="modal-backdrop-custom" role="presentation"><section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="tecnico-modal-title"><div className="form-modal-heading"><div><p className="eyebrow">EQUIPO DE MANTENIMIENTO</p><h2 id="tecnico-modal-title">Registrar técnico</h2></div><button className="icon-button" type="button" aria-label="Cerrar formulario" onClick={() => setModalAbierto(false)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div><form onSubmit={guardar}><div className="form-field"><label htmlFor="tec-id">ID de usuario <span>*</span></label><input id="tec-id" className="form-control" name="idUsuario" maxLength="30" required value={formulario.idUsuario} onChange={(event) => setFormulario({ ...formulario, idUsuario: event.target.value })} /></div><div className="form-row"><div className="form-field"><label htmlFor="tec-nombre">Nombre <span>*</span></label><input id="tec-nombre" className="form-control" name="nombre" maxLength="120" required value={formulario.nombre} onChange={(event) => setFormulario({ ...formulario, nombre: event.target.value })} /></div><div className="form-field"><label htmlFor="tec-depto">Departamento <span>*</span></label><input id="tec-depto" className="form-control" name="departamento" maxLength="120" required value={formulario.departamento} onChange={(event) => setFormulario({ ...formulario, departamento: event.target.value })} /></div></div><div className="form-field"><label htmlFor="tec-especialidad">Especialidad <span>*</span></label><input id="tec-especialidad" className="form-control" name="especialidad" maxLength="120" required value={formulario.especialidad} onChange={(event) => setFormulario({ ...formulario, especialidad: event.target.value })} /></div><div className="initial-state-note"><i className="bi bi-info-circle" aria-hidden="true" />La carga máxima admitida es de cinco casos activos.</div><div className="modal-actions"><button className="btn btn-light" type="button" onClick={() => setModalAbierto(false)}>Cancelar</button><button className="btn btn-primary" type="submit" disabled={guardando}>{guardando && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}Guardar técnico</button></div></form></section></div>}
+    {tecnicoEdicion && <div className="modal-backdrop-custom" role="presentation"><section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="editar-tecnico-titulo"><div className="form-modal-heading"><div><p className="eyebrow">TÉCNICO {tecnicoEdicion.idUsuario}</p><h2 id="editar-tecnico-titulo">Editar técnico</h2></div><button className="icon-button" type="button" aria-label="Cerrar edición" onClick={() => setTecnicoEdicion(null)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div><form onSubmit={guardarEdicion}><div className="form-field"><label htmlFor="editar-tec-id">ID de usuario</label><input id="editar-tec-id" className="form-control" value={tecnicoEdicion.idUsuario} disabled /></div><div className="form-field"><label htmlFor="editar-tec-nombre">Nombre <span>*</span></label><input id="editar-tec-nombre" className="form-control" maxLength="120" required value={tecnicoEdicion.nombre} onChange={(event) => setTecnicoEdicion({ ...tecnicoEdicion, nombre: event.target.value })} /></div><div className="form-row"><div className="form-field"><label htmlFor="editar-tec-departamento">Departamento <span>*</span></label><input id="editar-tec-departamento" className="form-control" maxLength="120" required value={tecnicoEdicion.departamento} onChange={(event) => setTecnicoEdicion({ ...tecnicoEdicion, departamento: event.target.value })} /></div><div className="form-field"><label htmlFor="editar-tec-especialidad">Especialidad <span>*</span></label><input id="editar-tec-especialidad" className="form-control" maxLength="120" required value={tecnicoEdicion.especialidad} onChange={(event) => setTecnicoEdicion({ ...tecnicoEdicion, especialidad: event.target.value })} /></div></div><div className="modal-actions"><button className="btn btn-light" type="button" disabled={guardando} onClick={() => setTecnicoEdicion(null)}>Cancelar</button><button className="btn btn-primary" type="submit" disabled={guardando}>Guardar cambios</button></div></form></section></div>}
+    {tecnicoDetalle && <DetalleRegistroModal titulo={`Técnico ${tecnicoDetalle.idUsuario}`} cargando={cargandoDetalle} alCerrar={() => setTecnicoDetalle(null)} campos={[
+      { etiqueta: 'ID', valor: tecnicoDetalle.idUsuario }, { etiqueta: 'Nombre', valor: tecnicoDetalle.nombre },
+      { etiqueta: 'Departamento', valor: tecnicoDetalle.departamento }, { etiqueta: 'Especialidad', valor: tecnicoDetalle.especialidad },
+      { etiqueta: 'Casos activos', valor: tecnicoDetalle.casosActivos }, { etiqueta: 'Disponibilidad', valor: tecnicoDetalle.disponibilidad },
+    ]} />}
     {tecnicoPorAsignar && <ConfirmacionModal titulo="Sumar caso manual" mensaje={`Se incrementará el contador de casos activos de ${tecnicoPorAsignar.nombre}. Esta operación no crea una solicitud y no se revierte desde este módulo.`} textoConfirmar="Incrementar carga" cargando={guardando} alCancelar={() => setTecnicoPorAsignar(null)} alConfirmar={asignarCaso} />}
   </section>;
 }

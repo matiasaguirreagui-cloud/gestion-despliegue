@@ -3,7 +3,8 @@ import ConfirmacionModal from '../components/ConfirmacionModal.jsx';
 import EstadoCarga from '../components/EstadoCarga.jsx';
 import TablaDatos from '../components/TablaDatos.jsx';
 import Toast from '../components/Toast.jsx';
-import { crearEquipo, marcarFueraDeServicio, obtenerEquipos } from '../api/equiposApi.js';
+import DetalleRegistroModal from '../components/DetalleRegistroModal.jsx';
+import { actualizarEquipo, crearEquipo, marcarFueraDeServicio, obtenerEquipoPorId, obtenerEquipos } from '../api/equiposApi.js';
 
 const formularioInicial = { idEquipo: '', marca: '', modelo: '', ubicacion: '' };
 
@@ -24,6 +25,9 @@ export default function EquiposPage() {
   const [formulario, setFormulario] = useState(formularioInicial);
   const [guardando, setGuardando] = useState(false);
   const [equipoPorInhabilitar, setEquipoPorInhabilitar] = useState(null);
+  const [equipoEdicion, setEquipoEdicion] = useState(null);
+  const [equipoDetalle, setEquipoDetalle] = useState(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [actualizandoEstado, setActualizandoEstado] = useState(false);
   const [aviso, setAviso] = useState(null);
 
@@ -71,13 +75,15 @@ export default function EquiposPage() {
     },
     {
       titulo: 'Acciones',
-      render: (equipo) => (equipo.estado?.toLowerCase() === 'fuera de servicio' ? (
-        <span className="action-completed">Sin acciones</span>
-      ) : (
-        <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => setEquipoPorInhabilitar(equipo)}>
-          <i className="bi bi-slash-circle me-1" aria-hidden="true" />Fuera de servicio
-        </button>
-      )),
+      render: (equipo) => <div className="d-flex flex-wrap gap-1">
+        <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => verDetalleEquipo(equipo.idEquipo)}>Ver</button>
+        <button className="btn btn-outline-primary btn-sm" type="button" onClick={() => editarEquipo(equipo.idEquipo)}>Editar</button>
+        {equipo.estado?.toLowerCase() === 'fuera de servicio' ? <span className="action-completed">Inhabilitado</span> : (
+          <button className="btn btn-outline-danger btn-sm" type="button" onClick={() => setEquipoPorInhabilitar(equipo)}>
+            <i className="bi bi-slash-circle me-1" aria-hidden="true" />Fuera de servicio
+          </button>
+        )}
+      </div>,
     },
   ], []);
 
@@ -111,6 +117,36 @@ export default function EquiposPage() {
     } finally {
       setGuardando(false);
     }
+  }
+
+  async function verDetalleEquipo(id) {
+    setCargandoDetalle(true);
+    setEquipoDetalle({ idEquipo: id });
+    try { setEquipoDetalle(await obtenerEquipoPorId(id)); }
+    catch (error) { setEquipoDetalle(null); setAviso({ tipo: 'error', mensaje: error.message }); }
+    finally { setCargandoDetalle(false); }
+  }
+
+  async function editarEquipo(id) {
+    try {
+      const equipo = await obtenerEquipoPorId(id);
+      setEquipoEdicion({ idEquipo: equipo.idEquipo, marca: equipo.marca || '', modelo: equipo.modelo || '', ubicacion: equipo.ubicacion || '' });
+    } catch (error) { setAviso({ tipo: 'error', mensaje: error.message }); }
+  }
+
+  async function guardarEdicion(evento) {
+    evento.preventDefault();
+    if (!equipoEdicion) return;
+    setGuardando(true);
+    try {
+      const actualizado = await actualizarEquipo(equipoEdicion.idEquipo, {
+        marca: equipoEdicion.marca.trim(), modelo: equipoEdicion.modelo.trim(), ubicacion: equipoEdicion.ubicacion.trim(),
+      });
+      setEquipos((actuales) => actuales.map((equipo) => equipo.idEquipo === actualizado.idEquipo ? actualizado : equipo));
+      setEquipoEdicion(null);
+      setAviso({ tipo: 'exito', mensaje: `El equipo ${actualizado.idEquipo} quedó actualizado.` });
+    } catch (error) { setAviso({ tipo: 'error', mensaje: error.message }); }
+    finally { setGuardando(false); }
   }
 
   async function confirmarFueraDeServicio() {
@@ -246,6 +282,20 @@ export default function EquiposPage() {
           alConfirmar={confirmarFueraDeServicio}
         />
       )}
+      {equipoDetalle && <DetalleRegistroModal titulo={`Equipo ${equipoDetalle.idEquipo}`} cargando={cargandoDetalle} alCerrar={() => setEquipoDetalle(null)} campos={[
+        { etiqueta: 'Código', valor: equipoDetalle.idEquipo }, { etiqueta: 'Nombre', valor: equipoDetalle.nombre },
+        { etiqueta: 'Marca', valor: equipoDetalle.marca }, { etiqueta: 'Modelo', valor: equipoDetalle.modelo },
+        { etiqueta: 'Ubicación', valor: equipoDetalle.ubicacion }, { etiqueta: 'Estado', valor: equipoDetalle.estado },
+        { etiqueta: 'Fallas reincidentes', valor: equipoDetalle.fallasReincidentes },
+      ]} />}
+      {equipoEdicion && <div className="modal-backdrop-custom" role="presentation"><section className="form-modal" role="dialog" aria-modal="true" aria-labelledby="editar-equipo-titulo">
+        <div className="form-modal-heading"><div><p className="eyebrow">EQUIPO {equipoEdicion.idEquipo}</p><h2 id="editar-equipo-titulo">Editar equipo</h2></div><button className="icon-button" type="button" aria-label="Cerrar edición" onClick={() => setEquipoEdicion(null)}><i className="bi bi-x-lg" aria-hidden="true" /></button></div>
+        <form onSubmit={guardarEdicion}><div className="form-field"><label htmlFor="editar-equipo-id">Código</label><input id="editar-equipo-id" className="form-control" value={equipoEdicion.idEquipo} disabled /></div>
+          <div className="form-row"><div className="form-field"><label htmlFor="editar-equipo-marca">Marca <span>*</span></label><input id="editar-equipo-marca" className="form-control" maxLength="120" required value={equipoEdicion.marca} onChange={(event) => setEquipoEdicion({ ...equipoEdicion, marca: event.target.value })} /></div><div className="form-field"><label htmlFor="editar-equipo-modelo">Modelo <span>*</span></label><input id="editar-equipo-modelo" className="form-control" maxLength="120" required value={equipoEdicion.modelo} onChange={(event) => setEquipoEdicion({ ...equipoEdicion, modelo: event.target.value })} /></div></div>
+          <div className="form-field"><label htmlFor="editar-equipo-ubicacion">Ubicación <span>*</span></label><input id="editar-equipo-ubicacion" className="form-control" maxLength="160" required value={equipoEdicion.ubicacion} onChange={(event) => setEquipoEdicion({ ...equipoEdicion, ubicacion: event.target.value })} /></div>
+          <div className="modal-actions"><button className="btn btn-light" type="button" disabled={guardando} onClick={() => setEquipoEdicion(null)}>Cancelar</button><button className="btn btn-primary" type="submit" disabled={guardando}>Guardar cambios</button></div>
+        </form>
+      </section></div>}
     </section>
   );
 }

@@ -63,5 +63,10 @@ public class Tecnico extends Usuario {
     public String getEspecialidad() { return especialidad; }
     public void setEspecialidad(String especialidad) { this.especialidad = especialidad; }
 
+    public void actualizarDatos(String nombre, String departamento, String especialidad) {
+        super.actualizarDatos(nombre, departamento);
+        this.especialidad = especialidad;
+    }
+
     public int getCasosActivos() { return casosActivos; }
 }

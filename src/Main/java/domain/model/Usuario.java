@@ -30,4 +30,9 @@ public abstract class Usuario {
     public String getIdUsuario() { return idUsuario; }
     public String getNombre() { return nombre; }
     public String getDepartamento() { return departamento; }
+
+    public void actualizarDatos(String nombre, String departamento) {
+        this.nombre = nombre;
+        this.departamento = departamento;
+    }
 }

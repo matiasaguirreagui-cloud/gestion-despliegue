@@ -1,118 +1,92 @@
 package service;
 
+import domain.exeptions.RecursoDuplicadoException;
+import domain.exeptions.RecursoNoEncontradoException;
 import domain.model.Equipo;
 import domain.repository.EquipoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
 public class EquipoService {
     private final EquipoRepository equipoRepository;
-    private final List<Equipo> equipos = new ArrayList<>();
 
-    public EquipoService() {
-        this.equipoRepository = null;
-        // Datos de prueba iniciales
-        equipos.add(new Equipo("EQ-100", "Impresora Industrial", "Piso 2"));
-        equipos.add(new Equipo("EQ-200", "Servidor Principal", "Data Center"));
-    }
-
-    @Autowired
     public EquipoService(EquipoRepository equipoRepository) {
         this.equipoRepository = equipoRepository;
     }
 
     public List<Equipo> obtenerTodos() {
-        if (equipoRepository != null) {
-            List<Equipo> ordenados = new ArrayList<>(equipoRepository.obtenerTodos());
-            ordenados.sort(Comparator.comparing(Equipo::isCritico).reversed());
-            return ordenados;
-        }
-        List<Equipo> ordenados = new ArrayList<>(equipos);
-        // Resalta los equipos CRÍTICOS al inicio de la lista manteniendo el orden relativo de los demás
+        List<Equipo> ordenados = new ArrayList<>(equipoRepository.obtenerTodos());
         ordenados.sort(Comparator.comparing(Equipo::isCritico).reversed());
         return ordenados;
     }
 
     public Optional<Equipo> buscarPorId(String idEquipo) {
-        if (idEquipo == null) {
+        if (idEquipo == null || idEquipo.isBlank()) {
             return Optional.empty();
         }
-        if (equipoRepository != null) {
-            return equipoRepository.buscarPorId(idEquipo.trim());
-        }
-        return equipos.stream()
-                .filter(e -> e.getIdEquipo().equalsIgnoreCase(idEquipo.trim()))
-                .findFirst();
+        return equipoRepository.buscarPorId(idEquipo.trim());
+    }
+
+    public Equipo obtenerPorId(String idEquipo) {
+        String id = ValidacionesEntrada.requerido(idEquipo, "código del equipo", 30);
+        return buscarPorId(id).orElseThrow(() -> new RecursoNoEncontradoException("No existe el equipo " + id + "."));
     }
 
     public Equipo registrarEquipo(String id, String nombre, String ubicacion) {
-        if (buscarPorId(id).isPresent()) {
-            throw codigoEquipoExistente(id);
-        }
-        if (equipoRepository != null) {
-            return equipoRepository.guardar(new Equipo(id, nombre, ubicacion));
-        }
-        Equipo equipo = new Equipo(id, nombre, ubicacion);
-        equipos.add(equipo);
-        return equipo;
+        String codigo = ValidacionesEntrada.requerido(id, "código del equipo", 30);
+        String nombreValidado = ValidacionesEntrada.requerido(nombre, "nombre del equipo", 120);
+        String ubicacionValidada = ValidacionesEntrada.requerido(ubicacion, "ubicación", 160);
+        validarNoDuplicado(codigo);
+        return equipoRepository.guardar(new Equipo(codigo, nombreValidado, ubicacionValidada));
     }
 
     public Equipo registrarEquipo(String id, String marca, String modelo, String ubicacion) {
-        String codigoValidado = validarRequerido(id, "código");
-        String marcaValidada = validarRequerido(marca, "marca");
-        String modeloValidado = validarRequerido(modelo, "modelo");
-        String ubicacionValidada = validarRequerido(ubicacion, "ubicación");
+        DatosEquipo datos = validarDatos(id, marca, modelo, ubicacion);
+        validarNoDuplicado(datos.id());
+        return equipoRepository.guardar(new Equipo(datos.id(), datos.marca(), datos.modelo(), datos.ubicacion()));
+    }
 
-        if (buscarPorId(codigoValidado).isPresent()) {
-            throw codigoEquipoExistente(codigoValidado);
-        }
+    @Transactional
+    public Equipo actualizarEquipo(String id, String marca, String modelo, String ubicacion) {
+        Equipo equipo = obtenerPorId(id);
+        DatosEquipo datos = validarDatos(id, marca, modelo, ubicacion);
+        equipo.actualizarDatos(datos.marca(), datos.modelo(), datos.ubicacion());
+        return equipoRepository.guardar(equipo);
+    }
 
-        Equipo equipo = new Equipo(codigoValidado, marcaValidada, modeloValidado, ubicacionValidada);
-        if (equipoRepository != null) {
-            return equipoRepository.guardar(equipo);
-        }
-        equipos.add(equipo);
-        return equipo;
+    @Transactional
+    public Equipo marcarFueraDeServicio(String idEquipo) {
+        Equipo equipo = obtenerPorId(idEquipo);
+        equipo.marcarFueraDeServicio();
+        return equipoRepository.guardar(equipo);
     }
 
     public Equipo obtenerORegistrarEquipo(String id, String nombre, String ubicacion) {
         return buscarPorId(id).orElseGet(() -> registrarEquipo(id, nombre, ubicacion));
     }
 
-    // Permite al administrador inhabilitar el equipo
-    @Transactional
-    public Equipo marcarFueraDeServicio(String idEquipo) {
-        Equipo equipo = (equipoRepository != null
-                ? equipoRepository.buscarPorId(idEquipo)
-                : equipos.stream()
-                    .filter(e -> e.getIdEquipo().equals(idEquipo))
-                    .findFirst())
-                .orElseThrow(() -> new NoSuchElementException("Equipo no encontrado: " + idEquipo));
-
-        equipo.marcarFueraDeServicio();
-        if (equipoRepository != null) {
-            equipoRepository.guardar(equipo);
+    private DatosEquipo validarDatos(String id, String marca, String modelo, String ubicacion) {
+        String codigo = ValidacionesEntrada.requerido(id, "código del equipo", 30);
+        String marcaValidada = ValidacionesEntrada.requerido(marca, "marca", 120);
+        String modeloValidado = ValidacionesEntrada.requerido(modelo, "modelo", 120);
+        if ((marcaValidada + " " + modeloValidado).length() > 120) {
+            throw new domain.exeptions.DatosInvalidosException("La marca y el modelo juntos no pueden superar 120 caracteres.");
         }
-        return equipo;
+        return new DatosEquipo(codigo, marcaValidada, modeloValidado,
+                ValidacionesEntrada.requerido(ubicacion, "ubicación", 160));
     }
 
-    private String validarRequerido(String valor, String campo) {
-        if (valor == null || valor.isBlank()) {
-            throw new IllegalArgumentException("Debe indicar el " + campo + " del equipo.");
+    private void validarNoDuplicado(String id) {
+        if (buscarPorId(id).isPresent()) {
+            throw new RecursoDuplicadoException("Ya existe un equipo registrado con el código " + id + ".");
         }
-        return valor.trim();
     }
 
-    private IllegalStateException codigoEquipoExistente(String idEquipo) {
-        return new IllegalStateException(
-                "Ya existe un equipo registrado con el código " + idEquipo + ".");
-    }
+    private record DatosEquipo(String id, String marca, String modelo, String ubicacion) {}
 }

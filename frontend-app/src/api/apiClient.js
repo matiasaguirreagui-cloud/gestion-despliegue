@@ -24,7 +24,8 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    const error = new Error(datos?.mensaje || `La solicitud falló (HTTP ${response.status}).`);
+    const detalle = [datos?.error, datos?.mensaje].filter(Boolean).join(': ');
+    const error = new Error(detalle || `La solicitud falló (HTTP ${response.status}).`);
     error.status = response.status;
     throw error;
   }
