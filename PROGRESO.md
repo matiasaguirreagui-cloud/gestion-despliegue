@@ -30,7 +30,7 @@ Documento de continuidad actualizado para la rama `despliegue` del repositorio o
 | 1. Backend: validación, excepciones, correo y CORS | ✅ Código implementado; compilación pendiente |
 | 2. Técnicos y equipos: CRUD permitido | ✅ Código + pruebas Mockito; compilación pendiente |
 | 3. Solicitudes, solicitantes y asignación | ✅ Código + pruebas Mockito; compilación pendiente |
-| 4. Revisiones preventivas y motor automático | 🟡 Código + pruebas Mockito en progreso |
+| 4. Revisiones preventivas y motor automático | ✅ Código + pruebas Mockito; compilación pendiente |
 | 5. Frontend conectado a consulta por ID y edición | 🟡 Código en progreso; build pendiente |
 | 6. Pruebas unitarias Mockito y `pruebas.http` | ⬜ Pendiente |
 | 7. Verificación real Aiven/Brevo y manual final | ⬜ Pendiente |

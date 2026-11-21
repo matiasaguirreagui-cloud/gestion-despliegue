@@ -54,4 +54,12 @@ public class RevisionPreventiva {
     public Equipo getEquipo() { return equipo; }
     public String getEmailSupervisor() { return emailSupervisor; }
     public String getIdRevision() { return idRevision; } // <--- Getter agregado
+
+    public void actualizarDatos(Equipo equipo, LocalDate fechaProgramada, int diasAvisoPrevio, String emailSupervisor) {
+        this.equipo = equipo;
+        this.fechaProgramada = fechaProgramada;
+        this.diasAvisoPrevio = diasAvisoPrevio;
+        this.emailSupervisor = emailSupervisor;
+        this.alertaGenerada = false;
+    }
 }

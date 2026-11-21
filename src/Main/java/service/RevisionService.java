@@ -1,35 +1,33 @@
 package service;
 
+import domain.exeptions.RecursoDuplicadoException;
+import domain.exeptions.RecursoNoEncontradoException;
 import domain.model.Equipo;
 import domain.model.RevisionPreventiva;
 import domain.model.UsuarioSolicitante;
 import domain.repository.EquipoRepository;
 import domain.repository.RevisionPreventivaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
+import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
 
 @Service
 public class RevisionService {
-    private final List<RevisionPreventiva> revisiones = new ArrayList<>();
+    private static final Logger logger = LoggerFactory.getLogger(RevisionService.class);
+    private static final ZoneId ZONA_NEGOCIO = ZoneId.of("America/Bogota");
+
     private final SolicitudService solicitudService;
     private final EmailService emailService;
     private final EquipoRepository equipoRepository;
     private final RevisionPreventivaRepository revisionRepository;
 
-    public RevisionService(SolicitudService solicitudService, EmailService emailService) {
-        this(solicitudService, emailService, null, null);
-    }
-
-    @Autowired
     public RevisionService(
             SolicitudService solicitudService,
             EmailService emailService,
@@ -41,76 +39,112 @@ public class RevisionService {
         this.revisionRepository = revisionRepository;
     }
 
-    // CRITERIO 1: Motor de alertas (Se ejecuta todos los días a las 8:00 AM)
-    // @Scheduled(cron = "0 0 8 * * ?")
-    @Scheduled(fixedRate = 10000)
-    @Transactional
+    @Scheduled(fixedRateString = "${app.revisiones.intervalo-ms:60000}")
     public void procesarAlertasPreventivas() {
-        LocalDate hoy = LocalDate.now(ZoneId.of("America/Bogota"));
-        List<RevisionPreventiva> revisionesActuales = revisionRepository != null
-                ? revisionRepository.obtenerTodas()
-                : revisiones;
-
-        for (RevisionPreventiva revision : revisionesActuales) {
-            if (!revision.isAlertaGenerada()) {
-                LocalDate fechaAlerta = revision.getFechaProgramada().minusDays(revision.getDiasAvisoPrevio());
-
-                if (hoy.isEqual(fechaAlerta) || hoy.isAfter(fechaAlerta)) {
-                    // 1. Enviar notificación al supervisor
-                    String asunto = "ALERTA: Mantenimiento Preventivo Próximo - " + revision.getEquipo().getNombre();
-                    String cuerpo = "El equipo requiere revisión el " + revision.getFechaProgramada() + ". Se ha generado la orden previa.";
-                    emailService.enviarCorreo(revision.getEmailSupervisor(), asunto, cuerpo);
-
-                    // 2. Crear la orden previa (Solicitud)
-                    UsuarioSolicitante sistema = new UsuarioSolicitante("SYS", "Sistema Motor Alertas", "Mantenimiento", revision.getEmailSupervisor());
-                    solicitudService.crearSolicitud(revision.getEquipo(), sistema, "Revisión preventiva programada");
-
-                    // 3. Marcar como generada para no repetir
-                    revision.setAlertaGenerada(true);
-                    if (revisionRepository != null) {
-                        revisionRepository.guardar(revision);
-                    }
-                }
+        LocalDate hoy = LocalDate.now(ZONA_NEGOCIO);
+        for (RevisionPreventiva revision : revisionRepository.obtenerTodas()) {
+            try {
+                procesarAlerta(revision, hoy);
+            } catch (Exception ex) {
+                logger.error("Falló el procesamiento de la revisión {} ({}). Se continuará con las demás.",
+                        revision.getIdRevision(), ex.getClass().getSimpleName(), ex);
             }
         }
     }
 
-    // CRITERIO 2: Reprogramar revisión (Recalcula la alerta)
-    public void reprogramarRevision(String idRevision, LocalDate nuevaFecha) {
-        Optional<RevisionPreventiva> revisionOpt = revisionRepository != null
-                ? revisionRepository.buscarPorId(idRevision)
-                : revisiones.stream()
-                    .filter(r -> r.getIdRevision().equals(idRevision))
-                    .findFirst();
-
-        if (revisionOpt.isPresent()) {
-            RevisionPreventiva revision = revisionOpt.get();
-            revision.setFechaProgramada(nuevaFecha);
-            // Al reiniciar este flag, el motor volverá a evaluar la nueva fecha
-            revision.setAlertaGenerada(false);
-            if (revisionRepository != null) {
-                revisionRepository.guardar(revision);
-            }
+    private void procesarAlerta(RevisionPreventiva revision, LocalDate hoy) {
+        if (revision.isAlertaGenerada()) {
+            return;
         }
+        LocalDate fechaAlerta = revision.getFechaProgramada().minusDays(revision.getDiasAvisoPrevio());
+        if (hoy.isBefore(fechaAlerta)) {
+            return;
+        }
+
+        String asunto = "ALERTA: Mantenimiento Preventivo Próximo - " + revision.getEquipo().getNombre();
+        String cuerpo = "El equipo requiere revisión el " + revision.getFechaProgramada()
+                + ". Se ha generado la orden previa.";
+        emailService.enviarCorreo(revision.getEmailSupervisor(), asunto, cuerpo);
+
+        UsuarioSolicitante sistema = new UsuarioSolicitante(
+                "SYS", "Sistema Motor Alertas", "Mantenimiento", revision.getEmailSupervisor());
+        solicitudService.crearSolicitud(revision.getEquipo(), sistema, "Revisión preventiva programada");
+
+        revision.setAlertaGenerada(true);
+        revisionRepository.guardar(revision);
+    }
+
+    public void reprogramarRevision(String idRevision, LocalDate nuevaFecha) {
+        RevisionPreventiva revision = obtenerPorId(idRevision);
+        if (nuevaFecha == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe indicar la nueva fecha de la revisión.");
+        }
+        revision.setFechaProgramada(nuevaFecha);
+        revision.setAlertaGenerada(false);
+        revisionRepository.guardar(revision);
     }
 
     public List<RevisionPreventiva> obtenerTodas() {
-        return revisionRepository != null
-                ? List.copyOf(revisionRepository.obtenerTodas())
-                : List.copyOf(revisiones);
+        return List.copyOf(revisionRepository.obtenerTodas());
     }
 
-    public void registrarRevision(RevisionPreventiva revision) {
-        if (revisionRepository != null) {
-            Equipo equipo = equipoRepository.buscarPorId(revision.getEquipo().getIdEquipo())
-                    .orElseThrow(() -> new NoSuchElementException(
-                            "No existe el equipo " + revision.getEquipo().getIdEquipo() + "."));
-            RevisionPreventiva revisionPersistida = new RevisionPreventiva(
-                    revision.getIdRevision(), equipo, revision.getFechaProgramada(),
-                    revision.getDiasAvisoPrevio(), revision.getEmailSupervisor());
-            revisionRepository.guardar(revisionPersistida);
-        } else {
-            revisiones.add(revision);
+    public RevisionPreventiva obtenerPorId(String idRevision) {
+        String id = ValidacionesEntrada.requerido(idRevision, "ID de revisión", 30);
+        return revisionRepository.buscarPorId(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe la revisión " + id + "."));
+    }
+
+    public RevisionPreventiva registrarRevision(RevisionPreventiva revision) {
+        if (revision == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe enviar los datos de la revisión.");
+        }
+        String id = ValidacionesEntrada.requerido(revision.getIdRevision(), "ID de revisión", 30);
+        if (revisionRepository.buscarPorId(id).isPresent()) {
+            throw new RecursoDuplicadoException("Ya existe una revisión con el código " + id + ".");
+        }
+        if (revision.getFechaProgramada() == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe indicar la fecha programada.");
+        }
+        validarDiasAviso(revision.getDiasAvisoPrevio());
+        if (revision.getEquipo() == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe asociar la revisión a un equipo.");
+        }
+        String idEquipo = ValidacionesEntrada.requerido(revision.getEquipo().getIdEquipo(), "ID del equipo", 30);
+        Equipo equipo = equipoRepository.buscarPorId(idEquipo)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el equipo " + idEquipo + "."));
+        String email = ValidacionesEntrada.email(revision.getEmailSupervisor(), "correo del supervisor");
+        RevisionPreventiva nueva = new RevisionPreventiva(id, equipo, revision.getFechaProgramada(),
+                revision.getDiasAvisoPrevio(), email);
+        return revisionRepository.guardar(nueva);
+    }
+
+    public RevisionPreventiva actualizarRevision(
+            String idRevision, String idEquipo, LocalDate fecha, int diasAvisoPrevio, String emailSupervisor) {
+        RevisionPreventiva revision = obtenerPorId(idRevision);
+        String codigoEquipo = ValidacionesEntrada.requerido(idEquipo, "ID del equipo", 30);
+        Equipo equipo = equipoRepository.buscarPorId(codigoEquipo)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No existe el equipo " + codigoEquipo + "."));
+        if (fecha == null) {
+            throw new domain.exeptions.DatosInvalidosException("Debe indicar la fecha programada.");
+        }
+        validarDiasAviso(diasAvisoPrevio);
+        String email = ValidacionesEntrada.email(emailSupervisor, "correo del supervisor");
+        revision.actualizarDatos(equipo, fecha, diasAvisoPrevio, email);
+        return revisionRepository.guardar(revision);
+    }
+
+    public LocalDate parsearFecha(String fecha) {
+        String valor = ValidacionesEntrada.requerido(fecha, "fecha", 10);
+        try {
+            return LocalDate.parse(valor);
+        } catch (DateTimeParseException ex) {
+            throw new domain.exeptions.DatosInvalidosException("La fecha debe usar el formato AAAA-MM-DD.");
+        }
+    }
+
+    private void validarDiasAviso(int dias) {
+        if (dias < 0) {
+            throw new domain.exeptions.DatosInvalidosException("Los días de aviso previo no pueden ser negativos.");
         }
     }
 }
