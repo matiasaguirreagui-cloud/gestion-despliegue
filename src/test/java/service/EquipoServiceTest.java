@@ -10,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -64,7 +63,6 @@ class EquipoServiceTest {
 
     @Test
     void informaSiNoExisteElEquipoSolicitado() {
-        when(equipoRepository.obtenerTodos()).thenReturn(List.of());
         when(equipoRepository.buscarPorId("EQ-INEXISTENTE")).thenReturn(Optional.empty());
 
         assertThrows(RecursoNoEncontradoException.class,

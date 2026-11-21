@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.clearInvocations;
 
 @ExtendWith(MockitoExtension.class)
 class RevisionServiceTest {
@@ -103,6 +104,7 @@ class RevisionServiceTest {
         revision.setAlertaGenerada(true);
         when(revisionRepository.buscarPorId("REV-003")).thenReturn(Optional.of(revision));
         LocalDate nueva = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(20);
+        clearInvocations(revisionRepository);
 
         revisionService.reprogramarRevision("REV-003", nueva);
 
