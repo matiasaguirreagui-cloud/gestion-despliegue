@@ -14,10 +14,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
@@ -47,7 +49,8 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.CONFLICT, "Conflicto", mensaje);
     }
 
-    @ExceptionHandler({RecursoNoEncontradoException.class, java.util.NoSuchElementException.class})
+    @ExceptionHandler({RecursoNoEncontradoException.class, java.util.NoSuchElementException.class,
+            NoResourceFoundException.class})
     public ResponseEntity<Map<String, String>> handleNoEncontrado(Exception ex) {
         return respuesta(HttpStatus.NOT_FOUND, "No encontrado", mensajeSeguro(ex, "No se encontró el recurso solicitado."));
     }
@@ -62,6 +65,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleMetodoNoPermitido(HttpRequestMethodNotSupportedException ex) {
         return respuesta(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido",
                 "El método HTTP solicitado no está disponible para este recurso.");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, String>> handleTipoNoPermitido(HttpMediaTypeNotSupportedException ex) {
+        return respuesta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Formato no permitido",
+                "El contenido de la solicitud debe enviarse en un formato compatible, como JSON.");
     }
 
     @ExceptionHandler(Exception.class)

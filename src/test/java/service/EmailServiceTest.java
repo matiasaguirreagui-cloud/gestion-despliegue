@@ -1,6 +1,7 @@
 package service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import domain.exeptions.ServicioCorreoException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,10 +66,10 @@ class EmailServiceTest {
         when(clienteHttp.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(respuestaHttp);
 
-        IllegalStateException error = assertThrows(IllegalStateException.class,
+        ServicioCorreoException error = assertThrows(ServicioCorreoException.class,
                 () -> emailService.enviarCorreo("destinatario@example.com", "Asunto", "Contenido"));
 
-        assertEquals("Brevo rechazó el correo (HTTP 401).", error.getMessage());
+        assertEquals("No se pudo enviar el correo mediante Brevo (HTTP 401).", error.getMessage());
     }
 
     @Test
@@ -81,11 +82,11 @@ class EmailServiceTest {
                 "Gestión de Mantenimiento",
                 "https://api.brevo.com/v3/smtp/email");
 
-        IllegalStateException error = assertThrows(IllegalStateException.class,
+        ServicioCorreoException error = assertThrows(ServicioCorreoException.class,
                 () -> servicioSinClave.enviarCorreo("destinatario@example.com", "Asunto", "Contenido"));
 
         assertEquals(
-                "Configura las variables BREVO_API_KEY y BREVO_SENDER_EMAIL para enviar correos.",
+                "No se pudo enviar el correo: la configuración de Brevo está incompleta.",
                 error.getMessage());
     }
 }

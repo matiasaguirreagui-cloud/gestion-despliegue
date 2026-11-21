@@ -7,7 +7,6 @@ import domain.repository.EquipoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -21,9 +20,9 @@ public class EquipoService {
     }
 
     public List<Equipo> obtenerTodos() {
-        List<Equipo> ordenados = new ArrayList<>(equipoRepository.obtenerTodos());
-        ordenados.sort(Comparator.comparing(Equipo::isCritico).reversed());
-        return ordenados;
+        return equipoRepository.obtenerTodos().stream()
+                .sorted(Comparator.comparing(Equipo::isCritico).reversed())
+                .toList();
     }
 
     public Optional<Equipo> buscarPorId(String idEquipo) {

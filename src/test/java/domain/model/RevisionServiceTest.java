@@ -28,6 +28,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class RevisionServiceTest {
@@ -42,9 +43,9 @@ class RevisionServiceTest {
     @BeforeEach
     void configurarServicio() {
         revisionService = new RevisionService(solicitudService, emailService, equipoRepository, revisionRepository);
-        when(revisionRepository.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
-        when(equipoRepository.buscarPorId("EQ-100")).thenReturn(Optional.of(equipo));
-        when(revisionRepository.buscarPorId(anyString())).thenReturn(Optional.empty());
+        lenient().when(revisionRepository.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
+        lenient().when(equipoRepository.buscarPorId("EQ-100")).thenReturn(Optional.of(equipo));
+        lenient().when(revisionRepository.buscarPorId(anyString())).thenReturn(Optional.empty());
     }
 
     @Test

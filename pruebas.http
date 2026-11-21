@@ -1,45 +1,169 @@
-### GET request to example server
-GET https://examples.http-client.intellij.net/get
-    ?generated-in=IntelliJ IDEA
+@baseUrl = http://localhost:8080
+@correoPrueba = {{$dotenv CORREO_PRUEBA}}
 
-###
+### Salud indirecta: consultar equipos
+GET {{baseUrl}}/api/equipos
+Accept: application/json
 
-### Crear solicitud y enviar correo
-POST http://127.0.0.1:8080/api/solicitudes
+### Crear equipo de prueba
+POST {{baseUrl}}/api/equipos
 Content-Type: application/json
 
 {
-  "equipoId": "EQ-101",
-  "equipoNombre": "Laptop Lenovo ThinkPad",
-  "equipoUbicacion": "Oficina 302",
-  "solicitanteId": "USR-001",
-  "solicitanteNombre": "Williams Balan",
-  "departamento": "Sistemas",
-  "email": "elilustre22@gmail.com",
-  "descripcion": "Prueba de envío de correo para mantenimiento preventivo"
+  "idEquipo": "PRUEBA-EQ01",
+  "marca": "PRUEBA Marca",
+  "modelo": "Equipo de ensayo",
+  "ubicacion": "Laboratorio de pruebas"
 }
 
+### Consultar equipo por ID
+GET {{baseUrl}}/api/equipos/PRUEBA-EQ01
+Accept: application/json
 
-### Programar Revisión Preventiva (Crea la alerta)
-POST http://127.0.0.1:8080/api/revisiones
+### Editar equipo
+PUT {{baseUrl}}/api/equipos/PRUEBA-EQ01
 Content-Type: application/json
 
 {
-  "idRevision": "REV-001",
-  "equipoId": "EQ-100",
-  "fechaProgramada": "2026-11-05",
+  "marca": "PRUEBA Marca actualizada",
+  "modelo": "Equipo de ensayo",
+  "ubicacion": "Laboratorio actualizado"
+}
+
+### Entrada inválida: equipo sin campos requeridos (400)
+POST {{baseUrl}}/api/equipos
+Content-Type: application/json
+
+{
+  "idEquipo": "",
+  "marca": "",
+  "modelo": "",
+  "ubicacion": ""
+}
+
+### Recurso inexistente (404)
+GET {{baseUrl}}/api/equipos/PRUEBA-NO-EXISTE
+
+### ID duplicado (409)
+POST {{baseUrl}}/api/equipos
+Content-Type: application/json
+
+{
+  "idEquipo": "PRUEBA-EQ01",
+  "marca": "PRUEBA Marca",
+  "modelo": "Duplicado",
+  "ubicacion": "Laboratorio de pruebas"
+}
+
+### Crear técnico de prueba
+POST {{baseUrl}}/api/tecnicos
+Content-Type: application/json
+
+{
+  "idUsuario": "PRUEBA-T01",
+  "nombre": "Técnico de prueba",
+  "departamento": "PRUEBA Mantenimiento",
+  "especialidad": "PRUEBA General"
+}
+
+### Consultar carga de técnicos
+GET {{baseUrl}}/api/tecnicos/carga
+Accept: application/json
+
+### Consultar técnico por ID
+GET {{baseUrl}}/api/tecnicos/PRUEBA-T01
+
+### Editar técnico
+PUT {{baseUrl}}/api/tecnicos/PRUEBA-T01
+Content-Type: application/json
+
+{
+  "idUsuario": "PRUEBA-T01",
+  "nombre": "Técnico de prueba editado",
+  "departamento": "PRUEBA Mantenimiento",
+  "especialidad": "PRUEBA Electromecánica"
+}
+
+### Crear revisión preventiva de prueba (fecha lejana para evitar el motor)
+POST {{baseUrl}}/api/revisiones
+Content-Type: application/json
+
+{
+  "idRevision": "PRUEBA-REV01",
+  "equipoId": "PRUEBA-EQ01",
+  "fechaProgramada": "2099-12-31",
   "diasAvisoPrevio": 3,
-  "emailSupervisor": "elilustre22@gmail.com"
+  "emailSupervisor": "{{correoPrueba}}"
 }
 
-###
+### Consultar revisiones
+GET {{baseUrl}}/api/revisiones
 
-### Reprogramar Revisión Preventiva (Recalcula la alerta)
-PUT http://127.0.0.1:8080/api/revisiones/REV-001/reprogramar
+### Consultar revisión por ID
+GET {{baseUrl}}/api/revisiones/PRUEBA-REV01
+
+### Editar revisión preventiva
+PUT {{baseUrl}}/api/revisiones/PRUEBA-REV01
 Content-Type: application/json
 
 {
-  "nuevaFecha": "2026-12-10"
+  "equipoId": "PRUEBA-EQ01",
+  "fechaProgramada": "2099-12-30",
+  "diasAvisoPrevio": 5,
+  "emailSupervisor": "{{correoPrueba}}"
 }
 
-###
+### Reprogramar revisión
+PUT {{baseUrl}}/api/revisiones/PRUEBA-REV01/reprogramar
+Content-Type: application/json
+
+{
+  "nuevaFecha": "2099-12-29"
+}
+
+### Error de fecha inválida (400)
+POST {{baseUrl}}/api/revisiones
+Content-Type: application/json
+
+{
+  "idRevision": "PRUEBA-FECHA-INVALIDA",
+  "equipoId": "PRUEBA-EQ01",
+  "fechaProgramada": "no-es-fecha",
+  "diasAvisoPrevio": 3,
+  "emailSupervisor": "{{correoPrueba}}"
+}
+
+### CORREO REAL: ejecutar solo después de definir CORREO_PRUEBA en el cliente HTTP
+### Este POST persiste la solicitud, asigna un técnico y manda correo a correoPrueba.
+### Ejecutar una sola vez por ciclo de pruebas y guardar el ID de solicitud de la respuesta.
+POST {{baseUrl}}/api/solicitudes
+Content-Type: application/json
+
+{
+  "equipoId": "PRUEBA-EQ01",
+  "equipoNombre": "PRUEBA Marca actualizada Equipo de ensayo",
+  "equipoUbicacion": "Laboratorio actualizado",
+  "solicitanteId": "PRUEBA-USR01",
+  "solicitanteNombre": "Solicitante de prueba",
+  "departamento": "PRUEBA Mantenimiento",
+  "email": "{{correoPrueba}}",
+  "descripcion": "PRUEBA- Solicitud de mantenimiento"
+}
+
+### Consultar todas las solicitudes
+GET {{baseUrl}}/api/solicitudes
+
+### Consultar una solicitud: reemplazar 1001 por el ID devuelto al crearla
+GET {{baseUrl}}/api/solicitudes/1001
+
+### Solicitud inexistente (404)
+GET {{baseUrl}}/api/solicitudes/999999999
+
+### Error JSON mal formado (400)
+POST {{baseUrl}}/api/equipos
+Content-Type: application/json
+
+{"idEquipo":
+
+### Error 502 de correo: cobertura determinista en EmailServiceTest/GlobalExceptionHandlerTest
+### No se simula con un envío real a Brevo para evitar correo fuera de control.
