@@ -2,6 +2,7 @@ package service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import domain.exeptions.ServicioCorreoException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -60,16 +61,19 @@ public class EmailService {
     public void enviarCorreo(String emailDestino, String asunto, String cuerpoEmail) {
         if (claveApi == null || claveApi.isBlank()
                 || correoRemitente == null || correoRemitente.isBlank()) {
-            throw new IllegalStateException(
-                    "Configura las variables BREVO_API_KEY y BREVO_SENDER_EMAIL para enviar correos.");
+            throw new ServicioCorreoException("No se pudo enviar el correo: la configuración de Brevo está incompleta.");
         }
+
+        String destinatario = ValidacionesEntrada.email(emailDestino, "correo destinatario");
+        String asuntoValidado = ValidacionesEntrada.requerido(asunto, "asunto", 180);
+        String cuerpoValidado = ValidacionesEntrada.requerido(cuerpoEmail, "contenido del correo", 10000);
 
         try {
             String cuerpoSolicitud = serializadorJson.writeValueAsString(Map.of(
                     "sender", Map.of("name", nombreRemitente, "email", correoRemitente),
-                    "to", List.of(Map.of("email", emailDestino)),
-                    "subject", asunto,
-                    "textContent", cuerpoEmail));
+                    "to", List.of(Map.of("email", destinatario)),
+                    "subject", asuntoValidado,
+                    "textContent", cuerpoValidado));
 
             HttpRequest solicitudHttp = HttpRequest.newBuilder(URI.create(urlApi))
                     .timeout(Duration.ofSeconds(20))
@@ -84,15 +88,14 @@ public class EmailService {
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
             if (respuesta.statusCode() < 200 || respuesta.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "Brevo rechazó el correo (HTTP " + respuesta.statusCode() + ").");
+                throw new ServicioCorreoException(
+                        "No se pudo enviar el correo mediante Brevo (HTTP " + respuesta.statusCode() + ").");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Se interrumpió el envío del correo.", e);
+            throw new ServicioCorreoException("No se pudo enviar el correo: se interrumpió la solicitud a Brevo.", e);
         } catch (IOException | IllegalArgumentException e) {
-            throw new IllegalStateException(
-                    "No fue posible enviar el correo mediante Brevo.", e);
+            throw new ServicioCorreoException("No se pudo enviar el correo mediante Brevo.", e);
         }
     }
 }

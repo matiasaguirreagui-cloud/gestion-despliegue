@@ -5,7 +5,7 @@ Documento de continuidad actualizado para la rama `despliegue` del repositorio o
 ## Estado actual
 
 - Trabajo iniciado el 2026-11-21 siguiendo las decisiones aprobadas en el chat.
-- Módulo 0 (entorno y configuración segura): implementación parcial.
+- Módulo 0 (entorno y configuración segura): completado en archivos; compilación/arranque pendientes por herramientas ausentes.
 - `.env` está presente localmente con permisos `600`, ignorado por Git; no se registran sus valores.
 - `.env.example` contiene únicamente nombres de variables.
 - Node.js 24.22.3 y npm 11.19.1 están disponibles; Node es compatible con Vite 8.
@@ -26,8 +26,8 @@ Documento de continuidad actualizado para la rama `despliegue` del repositorio o
 
 | Módulo | Estado |
 | --- | --- |
-| 0. Entorno, `.env.example` y arranque Linux | 🟡 En progreso |
-| 1. Backend: validación, excepciones, correo y CORS | ⬜ Pendiente |
+| 0. Entorno, `.env.example` y arranque Linux | ✅ Archivos listos; validación estática hecha |
+| 1. Backend: validación, excepciones, correo y CORS | 🟡 Implementación en progreso; compilación pendiente |
 | 2. Técnicos y equipos: CRUD permitido | ⬜ Pendiente |
 | 3. Solicitudes, solicitantes y asignación | ⬜ Pendiente |
 | 4. Revisiones preventivas y motor automático | ⬜ Pendiente |

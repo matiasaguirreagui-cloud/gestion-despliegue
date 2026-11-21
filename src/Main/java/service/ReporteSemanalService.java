@@ -51,13 +51,11 @@ public class ReporteSemanalService {
     }
 
     public ReporteSemanalDTO enviarReporteSemanal(String emailCoordinador) {
-        if (emailCoordinador == null || emailCoordinador.isBlank()) {
-            throw new IllegalArgumentException("Debe indicar el correo del coordinador de operaciones.");
-        }
+        String destinatario = ValidacionesEntrada.email(emailCoordinador, "correo del coordinador");
 
         ReporteSemanalDTO reporte = generarReporteSemanal();
         emailService.enviarCorreo(
-                emailCoordinador,
+                destinatario,
                 "Reporte semanal de solicitudes de mantenimiento",
                 construirCuerpoCorreo(reporte)
         );
